@@ -26,13 +26,14 @@ By default, the bucket configuration is below.
 - Enabled versioning
 - Enabled block public access
 - Enabled default encryption: SSE-S3(AES-256)`,
-		RunE: runCmdAws,
+		SilenceUsage: true,
+		RunE:         runCmdAws,
 	}
 
 	// flag
-	cmd.Flags().StringVarP(&bucketName, "bucket-name", "b", "", "S3 bucket to create")
-	cmd.MarkFlagRequired("bucket-name")
-	cmd.Flags().StringVarP(&bucketName, "region", "r", "", "Region where S3 bucket will be created. If not specified, tfbackend automatically set region from your cli configuration.")
+	cmd.Flags().StringVarP(&bucketName, "bucket", "", "", "S3 bucket to create")
+	cmd.MarkFlagRequired("bucket")
+	cmd.Flags().StringVarP(&bucketName, "region", "", "", "Region where S3 bucket will be created. If not specified, tfbackend automatically set region from your cli configuration.")
 
 	return cmd
 }
