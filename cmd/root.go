@@ -17,7 +17,6 @@ func NewCmdRoot() *cobra.Command {
 		Use:           "tfbackend",
 		Short:         "tfbackend is a CLI tool to create terraform backend to cloud.",
 		Long:          `tfbackend is a CLI tool to create terraform backend to cloud.`,
-		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
 	cobra.OnInitialize(initConfig)
