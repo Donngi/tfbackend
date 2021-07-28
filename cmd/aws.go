@@ -19,6 +19,10 @@ var (
 	billingMode string
 )
 
+type DynamoDBClientable interface {
+	CreateTable(ctx context.Context, params *dynamodb.CreateTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.CreateTableOutput, error)
+}
+
 func NewCmdAws() *cobra.Command {
 	cmd := &cobra.Command{
 
@@ -118,15 +122,23 @@ func runCmdAws(cmd *cobra.Command, args []string) error {
 	// --------------------------
 	dynamodb := dynamodb.NewFromConfig(cfg)
 
+	if err := initDynamoDB(dynamodb, tableName, billingMode); err != nil {
+		return fmt.Errorf("failed to create dynamodb table: %w", err)
+	}
+
+	return nil
+}
+
+func initDynamoDB(c DynamoDBClientable, tableName string, billingMode string) error {
 	fmt.Printf("\n")
 	fmt.Printf("Start to create terraform lock table: DynamoDB ... \n")
 	fmt.Printf("\n")
 
 	// Create table
 	fmt.Printf("Step1: Creating table ... ")
-	if _, err := createDynamoDBTable(context.TODO(), dynamodb, tableName, billingMode); err != nil {
+	if _, err := createDynamoDBTable(context.TODO(), c, tableName, billingMode); err != nil {
 		printRed("FAILURE\n\n")
-		return fmt.Errorf("failed to create dynamodb table: %w", err)
+		return fmt.Errorf("%w", err)
 	}
 	fmt.Printf("SUCCESS\n")
 
