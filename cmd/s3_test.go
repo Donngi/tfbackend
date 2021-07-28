@@ -43,14 +43,14 @@ func Test_createBucket_Success(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// When
 			api := mockCreateBucketAPI{}
-			res, err := createS3Bucket(context.Background(), api, tt.args.bucketName, tt.args.region)
+			got, err := createS3Bucket(context.Background(), api, tt.args.bucketName, tt.args.region)
 
 			// Then
 			if err != nil {
 				t.Errorf("createBucket() error = %v, want = nil", err)
 			}
-			if *res.Location != tt.want {
-				t.Errorf("createBucket() res = %v, want = %v", res.Location, tt.want)
+			if *got.Location != tt.want {
+				t.Errorf("createBucket() got = %v, want = %v", got.Location, tt.want)
 			}
 		})
 	}
@@ -88,4 +88,3 @@ func Test_createBucket_Success(t *testing.T) {
 // 		})
 // 	}
 // }
-
