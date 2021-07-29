@@ -8,18 +8,29 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-type mockDynamoDBCreateTableAPI struct{}
+type mockDynamoDBCreateTableAPI func(ctx context.Context,
+	params *dynamodb.CreateTableInput,
+	optFns ...func(*dynamodb.Options)) (*dynamodb.CreateTableOutput, error)
 
 func (m mockDynamoDBCreateTableAPI) CreateTable(ctx context.Context,
 	params *dynamodb.CreateTableInput,
 	optFns ...func(*dynamodb.Options)) (*dynamodb.CreateTableOutput, error) {
 
-	out := dynamodb.CreateTableOutput{
-		TableDescription: &types.TableDescription{
-			TableName: params.TableName,
-		},
-	}
-	return &out, nil
+	return m(ctx, params, optFns...)
+}
+
+func createMockDynamoDBCreateTableAPIReturnInputTableName(t *testing.T) DynamoDBCreateTableAPI {
+	return mockDynamoDBCreateTableAPI(func(ctx context.Context,
+		params *dynamodb.CreateTableInput,
+		optFns ...func(*dynamodb.Options)) (*dynamodb.CreateTableOutput, error) {
+
+		out := dynamodb.CreateTableOutput{
+			TableDescription: &types.TableDescription{
+				TableName: params.TableName,
+			},
+		}
+		return &out, nil
+	})
 }
 
 func Test_createDynamoDBTable_Success(t *testing.T) {
@@ -30,6 +41,7 @@ func Test_createDynamoDBTable_Success(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
+		api     func(t *testing.T) DynamoDBCreateTableAPI
 		want    string
 		wantErr bool
 	}{
@@ -40,6 +52,7 @@ func Test_createDynamoDBTable_Success(t *testing.T) {
 				tableName:   "TestTable",
 				billingMode: "PAY_PER_REQUEST",
 			},
+			api:     createMockDynamoDBCreateTableAPIReturnInputTableName,
 			want:    "TestTable",
 			wantErr: false,
 		},
@@ -49,6 +62,7 @@ func Test_createDynamoDBTable_Success(t *testing.T) {
 				tableName:   "TestTable",
 				billingMode: "PROVISIONED",
 			},
+			api:     createMockDynamoDBCreateTableAPIReturnInputTableName,
 			want:    "TestTable",
 			wantErr: false,
 		},
@@ -57,8 +71,7 @@ func Test_createDynamoDBTable_Success(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			// When
-			api := mockDynamoDBCreateTableAPI{}
-			got, err := createDynamoDBTable(context.Background(), api, tt.args.tableName, tt.args.billingMode)
+			got, err := createDynamoDBTable(context.Background(), tt.api(t), tt.args.tableName, tt.args.billingMode)
 
 			// Then
 			if (err != nil) != tt.wantErr {
@@ -80,6 +93,7 @@ func Test_createDynamoDBTable_Failure(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
+		api     func(t *testing.T) DynamoDBCreateTableAPI
 		want    *dynamodb.CreateTableOutput
 		wantErr bool
 	}{
@@ -90,6 +104,7 @@ func Test_createDynamoDBTable_Failure(t *testing.T) {
 				tableName:   "TestTable",
 				billingMode: "invalid💀",
 			},
+			api:     createMockDynamoDBCreateTableAPIReturnInputTableName,
 			want:    nil,
 			wantErr: true,
 		},
@@ -98,8 +113,7 @@ func Test_createDynamoDBTable_Failure(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			// When
-			api := mockDynamoDBCreateTableAPI{}
-			got, err := createDynamoDBTable(context.Background(), api, tt.args.tableName, tt.args.billingMode)
+			got, err := createDynamoDBTable(context.Background(), tt.api(t), tt.args.tableName, tt.args.billingMode)
 
 			// Then
 			if (err != nil) != tt.wantErr {
