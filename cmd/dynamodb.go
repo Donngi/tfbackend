@@ -46,3 +46,17 @@ func createDynamoDBTable(c context.Context, api DynamoDBCreateTableAPI, tableNam
 
 	return api.CreateTable(c, in)
 }
+
+type DynamoDBDescribeTableAPI interface {
+	DescribeTable(ctx context.Context,
+		params *dynamodb.DescribeTableInput,
+		optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
+}
+
+func describeDynamoDBTable(c context.Context, api DynamoDBDescribeTableAPI, tableName string) (*dynamodb.DescribeTableOutput, error) {
+	in := &dynamodb.DescribeTableInput{
+		TableName: &tableName,
+	}
+
+	return api.DescribeTable(c, in)
+}
