@@ -3,12 +3,15 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"unicode"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -41,6 +44,16 @@ type DynamoDBClientable interface {
 	CreateTable(ctx context.Context,
 		params *dynamodb.CreateTableInput,
 		optFns ...func(*dynamodb.Options)) (*dynamodb.CreateTableOutput, error)
+	DescribeTable(ctx context.Context,
+		params *dynamodb.DescribeTableInput,
+		optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
+}
+
+type initDynamoDBResult struct {
+	TableName     string
+	BillingMode   string
+	WriteCapacity string
+	ReadCapacity  string
 }
 
 func NewCmdAws() *cobra.Command {
@@ -106,9 +119,23 @@ func runCmdAws(cmd *cobra.Command, args []string) error {
 	// Initialize DynamoDB table.
 	if tableName != "" {
 		dynamodb := dynamodb.NewFromConfig(cfg)
-		if err := initDynamoDB(dynamodb, tableName, billingMode); err != nil {
+		res, err := initDynamoDB(dynamodb, tableName, billingMode)
+		if err != nil {
 			return fmt.Errorf("failed to initialize dynamodb table: %w", err)
 		}
+
+		printCyan(fmt.Sprintf("Successfully create terraform lock table - dynamodb table: %v\n", tableName))
+		fmt.Printf("Detail ... \n\n")
+		table := tablewriter.NewWriter(os.Stdout)
+		h, b := res.createTableInput()
+		table.SetHeader(h)
+		for _, v := range b {
+			table.Append(v)
+		}
+		table.SetAlignment(tablewriter.ALIGN_LEFT)
+		table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+		table.SetCenterSeparator("|")
+		table.Render()
 	}
 
 	return nil
@@ -152,29 +179,68 @@ func initS3(c S3Clientable, bucketName string, region string) error {
 	}
 	fmt.Printf("SUCCESS\n")
 	fmt.Printf("\n")
-
 	printCyan(fmt.Sprintf("Successfully create terraform backend - s3 bucket: %v\n", bucketName))
 
 	return nil
 }
 
 // initDynamoDB setup terraform lock table with messages.
-func initDynamoDB(c DynamoDBClientable, tableName string, billingMode string) error {
+func initDynamoDB(c DynamoDBClientable, tableName string, billingMode string) (*initDynamoDBResult, error) {
 	fmt.Printf("\n")
+	fmt.Printf("---------------------------------------------------\n")
 	fmt.Printf("Start to create terraform lock table: DynamoDB ... \n")
+	fmt.Printf("---------------------------------------------------\n")
 	fmt.Printf("\n")
 
 	// Create table
 	fmt.Printf("Step1: Creating table ... ")
 	if _, err := createDynamoDBTable(context.TODO(), c, tableName, billingMode); err != nil {
 		printRed("FAILURE\n\n")
-		return fmt.Errorf("failed to create dynamodb table: %w", err)
+		return nil, fmt.Errorf("failed to create dynamodb table: %w", err)
 	}
-	fmt.Printf("SUCCESS\n")
+	fmt.Printf("SUCCESS\n\n")
 
-	printCyan(fmt.Sprintf("Successfully create terraform lock table - dynamodb table: %v\n", tableName))
+	// Describe table
+	desc, err := describeDynamoDBTable(context.TODO(), c, tableName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create dynamodb table: %w", err)
+	}
+	res := initDynamoDBResult{}
+	if desc.Table.TableName != nil {
+		res.TableName = *desc.Table.TableName
+	}
 
-	return nil
+	if desc.Table.BillingModeSummary != nil {
+		res.BillingMode = string(desc.Table.BillingModeSummary.BillingMode)
+	} else if desc.Table.ProvisionedThroughput != nil {
+		res.BillingMode = "PROVISIONED"
+	}
+
+	if desc.Table.ProvisionedThroughput != nil {
+		res.WriteCapacity = strconv.FormatInt(*desc.Table.ProvisionedThroughput.WriteCapacityUnits, 10)
+		res.ReadCapacity = strconv.FormatInt(*desc.Table.ProvisionedThroughput.ReadCapacityUnits, 10)
+	}
+
+	return &res, nil
+}
+
+func (i *initDynamoDBResult) createTableInput() (header []string, body [][]string) {
+	h := []string{"PARAMETER", "VALUE"}
+	if i.BillingMode == "PAY_PER_REQUEST" {
+		b := [][]string{
+			{"Table name", i.TableName},
+			{"Billing mode", i.BillingMode},
+		}
+		return h, b
+	} else {
+		b := [][]string{
+			{"Table name", i.TableName},
+			{"Billing mode", i.BillingMode},
+			{"Write capacity", i.WriteCapacity},
+			{"Read capacity", i.ReadCapacity},
+		}
+		return h, b
+	}
 }
 
 // validateBucketName checks if bucket name contains capitals.
