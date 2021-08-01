@@ -91,3 +91,14 @@ func getPublicAccessBlock(c context.Context, api S3GetPublicAccessBlockAPI, buck
 	}
 	return api.GetPublicAccessBlock(c, in)
 }
+
+type S3GetBucketVersioningAPI interface {
+	GetBucketVersioning(ctx context.Context, params *s3.GetBucketVersioningInput, optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)
+}
+
+func getBucketVersioning(c context.Context, api S3GetBucketVersioningAPI, bucketName string) (*s3.GetBucketVersioningOutput, error) {
+	in := &s3.GetBucketVersioningInput{
+		Bucket: &bucketName,
+	}
+	return api.GetBucketVersioning(c, in)
+}

@@ -431,6 +431,22 @@ func Test_getPublicAccessBlock(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "F01: Some error",
+			args: args{
+				bucketName: "failure-bucket",
+				api: func(t *testing.T) S3GetPublicAccessBlockAPI {
+					return mockS3GetPublicAccessBlockAPI(func(ctx context.Context,
+						params *s3.GetPublicAccessBlockInput,
+						optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error) {
+
+						return nil, errors.New("some error")
+					})
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -439,8 +455,83 @@ func Test_getPublicAccessBlock(t *testing.T) {
 				t.Errorf("getPublicAccessBlock() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got.PublicAccessBlockConfiguration, tt.want) {
-				t.Errorf("getPublicAccessBlock() got.PublicAccessBlockConfiguration %v, want %v", got, tt.want)
+			if tt.want != nil {
+				if !reflect.DeepEqual(got.PublicAccessBlockConfiguration, tt.want) {
+					t.Errorf("getPublicAccessBlock() got.PublicAccessBlockConfiguration %v, want %v", got, tt.want)
+				}
+			}
+		})
+	}
+}
+
+type mockS3GetBucketVersioning func(ctx context.Context,
+	params *s3.GetBucketVersioningInput,
+	optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)
+
+func (m mockS3GetBucketVersioning) GetBucketVersioning(ctx context.Context,
+	params *s3.GetBucketVersioningInput,
+	optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error) {
+
+	return m(ctx, params, optFns...)
+}
+func Test_getBucketVersioning(t *testing.T) {
+	type args struct {
+		api        func(t *testing.T) S3GetBucketVersioningAPI
+		bucketName string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    types.BucketVersioningStatus
+		wantErr bool
+	}{
+		{
+			name: "S01: Happy path",
+			args: args{
+				bucketName: "happy-bucket",
+				api: func(t *testing.T) S3GetBucketVersioningAPI {
+					return mockS3GetBucketVersioning(func(ctx context.Context,
+						params *s3.GetBucketVersioningInput,
+						optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error) {
+
+						out := &s3.GetBucketVersioningOutput{
+							Status: types.BucketVersioningStatusEnabled,
+						}
+						return out, nil
+					})
+				},
+			},
+			want:    types.BucketVersioningStatusEnabled,
+			wantErr: false,
+		},
+		{
+			name: "F01: Some error",
+			args: args{
+				bucketName: "failure-bucket",
+				api: func(t *testing.T) S3GetBucketVersioningAPI {
+					return mockS3GetBucketVersioning(func(ctx context.Context,
+						params *s3.GetBucketVersioningInput,
+						optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error) {
+
+						return nil, errors.New("some error")
+					})
+				},
+			},
+			want:    "failure💀",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getBucketVersioning(context.Background(), tt.args.api(t), tt.args.bucketName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getBucketVersioning() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.want == types.BucketVersioningStatusEnabled || tt.want == types.BucketVersioningStatusSuspended {
+				if !reflect.DeepEqual(got.Status, tt.want) {
+					t.Errorf("getBucketVersioning() got.Status %v, want %v", got.Status, tt.want)
+				}
 			}
 		})
 	}
