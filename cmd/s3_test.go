@@ -3,10 +3,12 @@ package cmd
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type mockS3CreateBucketAPI func(ctx context.Context,
@@ -374,6 +376,71 @@ func Test_enableBucketVersioning_Failure(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("enableBucketVersioning() error = %v, wantErr = %v", err, tt.wantErr)
 				return
+			}
+		})
+	}
+}
+
+type mockS3GetPublicAccessBlockAPI func(ctx context.Context,
+	params *s3.GetPublicAccessBlockInput,
+	optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error)
+
+func (m mockS3GetPublicAccessBlockAPI) GetPublicAccessBlock(ctx context.Context,
+	params *s3.GetPublicAccessBlockInput,
+	optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error) {
+
+	return m(ctx, params, optFns...)
+}
+func Test_getPublicAccessBlock(t *testing.T) {
+	type args struct {
+		bucketName string
+		api        func(t *testing.T) S3GetPublicAccessBlockAPI
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *types.PublicAccessBlockConfiguration
+		wantErr bool
+	}{
+		{
+			name: "S01: Happy path",
+			args: args{
+				bucketName: "happy-bucket",
+				api: func(t *testing.T) S3GetPublicAccessBlockAPI {
+					return mockS3GetPublicAccessBlockAPI(func(ctx context.Context,
+						params *s3.GetPublicAccessBlockInput,
+						optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error) {
+
+						out := &s3.GetPublicAccessBlockOutput{
+							PublicAccessBlockConfiguration: &types.PublicAccessBlockConfiguration{
+								BlockPublicAcls:       true,
+								BlockPublicPolicy:     true,
+								IgnorePublicAcls:      true,
+								RestrictPublicBuckets: true,
+							},
+						}
+						return out, nil
+					})
+				},
+			},
+			want: &types.PublicAccessBlockConfiguration{
+				BlockPublicAcls:       true,
+				BlockPublicPolicy:     true,
+				IgnorePublicAcls:      true,
+				RestrictPublicBuckets: true,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getPublicAccessBlock(context.Background(), tt.args.api(t), tt.args.bucketName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getPublicAccessBlock() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got.PublicAccessBlockConfiguration, tt.want) {
+				t.Errorf("getPublicAccessBlock() got.PublicAccessBlockConfiguration %v, want %v", got, tt.want)
 			}
 		})
 	}

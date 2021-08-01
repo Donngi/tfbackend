@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -78,4 +79,15 @@ func enableBucketVersioning(c context.Context, api S3PutBucketVersioningAPI, buc
 		},
 	}
 	return api.PutBucketVersioning(c, in)
+}
+
+type S3GetPublicAccessBlockAPI interface {
+	GetPublicAccessBlock(ctx context.Context, params *s3.GetPublicAccessBlockInput, optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error)
+}
+
+func getPublicAccessBlock(c context.Context, api S3GetPublicAccessBlockAPI, bucketName string) (*s3.GetPublicAccessBlockOutput, error) {
+	in := &s3.GetPublicAccessBlockInput{
+		Bucket: aws.String(bucketName),
+	}
+	return api.GetPublicAccessBlock(c, in)
 }
