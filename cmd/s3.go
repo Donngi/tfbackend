@@ -82,18 +82,22 @@ func enableBucketVersioning(c context.Context, api S3PutBucketVersioningAPI, buc
 }
 
 type S3GetbucketLocation interface {
-	GetBucketLocation(ctx context.Context, params *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error)
+	GetBucketLocation(ctx context.Context,
+		params *s3.GetBucketLocationInput,
+		optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error)
 }
 
-func GetBucketLocation(c context.Context, api S3GetbucketLocation, bucketName string) (*s3.GetBucketLocationOutput, error) {
+func getBucketLocation(c context.Context, api S3GetbucketLocation, bucketName string) (*s3.GetBucketLocationOutput, error) {
 	in := &s3.GetBucketLocationInput{
-		Bucket: &bucketName,
+		Bucket: aws.String(bucketName),
 	}
 	return api.GetBucketLocation(c, in)
 }
 
 type S3GetPublicAccessBlockAPI interface {
-	GetPublicAccessBlock(ctx context.Context, params *s3.GetPublicAccessBlockInput, optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error)
+	GetPublicAccessBlock(ctx context.Context,
+		params *s3.GetPublicAccessBlockInput,
+		optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error)
 }
 
 func getPublicAccessBlock(c context.Context, api S3GetPublicAccessBlockAPI, bucketName string) (*s3.GetPublicAccessBlockOutput, error) {
@@ -104,23 +108,27 @@ func getPublicAccessBlock(c context.Context, api S3GetPublicAccessBlockAPI, buck
 }
 
 type S3GetBucketEncryption interface {
-	GetBucketEncryption(ctx context.Context, params *s3.GetBucketEncryptionInput, optFns ...func(*s3.Options)) (*s3.GetBucketEncryptionOutput, error)
+	GetBucketEncryption(ctx context.Context,
+		params *s3.GetBucketEncryptionInput,
+		optFns ...func(*s3.Options)) (*s3.GetBucketEncryptionOutput, error)
 }
 
-func getBucketEncryption(c context.Context, api S3GetBucketEncryption, optFns ...func(*s3.Options)) (*s3.GetBucketEncryptionOutput, error) {
+func getBucketEncryption(c context.Context, api S3GetBucketEncryption, bucketName string) (*s3.GetBucketEncryptionOutput, error) {
 	in := &s3.GetBucketEncryptionInput{
-		Bucket: &bucketName,
+		Bucket: aws.String(bucketName),
 	}
 	return api.GetBucketEncryption(c, in)
 }
 
 type S3GetBucketVersioningAPI interface {
-	GetBucketVersioning(ctx context.Context, params *s3.GetBucketVersioningInput, optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)
+	GetBucketVersioning(ctx context.Context,
+		params *s3.GetBucketVersioningInput,
+		optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)
 }
 
 func getBucketVersioning(c context.Context, api S3GetBucketVersioningAPI, bucketName string) (*s3.GetBucketVersioningOutput, error) {
 	in := &s3.GetBucketVersioningInput{
-		Bucket: &bucketName,
+		Bucket: aws.String(bucketName),
 	}
 	return api.GetBucketVersioning(c, in)
 }

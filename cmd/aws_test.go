@@ -1,14 +1,8 @@
 package cmd
 
 import (
-	"context"
-	"errors"
 	"reflect"
 	"testing"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 func Test_validateBucketName(t *testing.T) {
@@ -85,107 +79,6 @@ func Test_validateBillingMode(t *testing.T) {
 			}
 		})
 	}
-}
-
-type mockDynamoDBClientAllSuccessProvisionedWrite5Read5 struct{}
-
-func (m mockDynamoDBClientAllSuccessProvisionedWrite5Read5) CreateTable(ctx context.Context,
-	params *dynamodb.CreateTableInput,
-	optFns ...func(*dynamodb.Options)) (*dynamodb.CreateTableOutput, error) {
-	return &dynamodb.CreateTableOutput{}, nil
-}
-
-func (m mockDynamoDBClientAllSuccessProvisionedWrite5Read5) DescribeTable(ctx context.Context,
-	params *dynamodb.DescribeTableInput,
-	optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
-
-	return &dynamodb.DescribeTableOutput{
-		Table: &types.TableDescription{
-			TableName: aws.String("happy-bucket"),
-			BillingModeSummary: &types.BillingModeSummary{
-				BillingMode: types.BillingModeProvisioned,
-			},
-			ProvisionedThroughput: &types.ProvisionedThroughputDescription{
-				ReadCapacityUnits:  aws.Int64(5),
-				WriteCapacityUnits: aws.Int64(5),
-			},
-		},
-	}, nil
-}
-
-type mockDynamoDBClientAllSuccessProvisionedWrite5Read5WithoutBillingModeSummary struct{}
-
-func (m mockDynamoDBClientAllSuccessProvisionedWrite5Read5WithoutBillingModeSummary) CreateTable(ctx context.Context,
-	params *dynamodb.CreateTableInput,
-	optFns ...func(*dynamodb.Options)) (*dynamodb.CreateTableOutput, error) {
-	return &dynamodb.CreateTableOutput{}, nil
-}
-
-func (m mockDynamoDBClientAllSuccessProvisionedWrite5Read5WithoutBillingModeSummary) DescribeTable(ctx context.Context,
-	params *dynamodb.DescribeTableInput,
-	optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
-
-	return &dynamodb.DescribeTableOutput{
-		Table: &types.TableDescription{
-			TableName: aws.String("happy-bucket"),
-			ProvisionedThroughput: &types.ProvisionedThroughputDescription{
-				ReadCapacityUnits:  aws.Int64(5),
-				WriteCapacityUnits: aws.Int64(5),
-			},
-		},
-	}, nil
-}
-
-type mockDynamoDBClientAllSuccessPayPerRequest struct{}
-
-func (m mockDynamoDBClientAllSuccessPayPerRequest) CreateTable(ctx context.Context,
-	params *dynamodb.CreateTableInput,
-	optFns ...func(*dynamodb.Options)) (*dynamodb.CreateTableOutput, error) {
-	return &dynamodb.CreateTableOutput{}, nil
-}
-
-func (m mockDynamoDBClientAllSuccessPayPerRequest) DescribeTable(ctx context.Context,
-	params *dynamodb.DescribeTableInput,
-	optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
-
-	return &dynamodb.DescribeTableOutput{
-		Table: &types.TableDescription{
-			TableName: aws.String("happy-bucket"),
-			BillingModeSummary: &types.BillingModeSummary{
-				BillingMode: types.BillingModePayPerRequest,
-			},
-		},
-	}, nil
-}
-
-type mockDynamoDBClientFailureCreateTableNG struct{}
-
-func (m mockDynamoDBClientFailureCreateTableNG) CreateTable(ctx context.Context,
-	params *dynamodb.CreateTableInput,
-	optFns ...func(*dynamodb.Options)) (*dynamodb.CreateTableOutput, error) {
-	return nil, errors.New("some error")
-}
-
-func (m mockDynamoDBClientFailureCreateTableNG) DescribeTable(ctx context.Context,
-	params *dynamodb.DescribeTableInput,
-	optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
-
-	return &dynamodb.DescribeTableOutput{}, nil
-}
-
-type mockDynamoDBClientFailureDescribeTableNG struct{}
-
-func (m mockDynamoDBClientFailureDescribeTableNG) CreateTable(ctx context.Context,
-	params *dynamodb.CreateTableInput,
-	optFns ...func(*dynamodb.Options)) (*dynamodb.CreateTableOutput, error) {
-	return &dynamodb.CreateTableOutput{}, nil
-}
-
-func (m mockDynamoDBClientFailureDescribeTableNG) DescribeTable(ctx context.Context,
-	params *dynamodb.DescribeTableInput,
-	optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
-
-	return nil, errors.New("some error")
 }
 
 func Test_initDynamoDB(t *testing.T) {
@@ -333,6 +226,182 @@ func Test_initDynamoDBResult_createTableInput(t *testing.T) {
 			}
 			if !reflect.DeepEqual(gotBody, tt.wantBody) {
 				t.Errorf("initDynamoDBResult.createTableInput() gotBody = %v, want %v", gotBody, tt.wantBody)
+			}
+		})
+	}
+}
+
+func Test_initS3(t *testing.T) {
+	type args struct {
+		c          S3Clientable
+		bucketName string
+		region     string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *initS3Result
+		wantErr bool
+	}{
+		{
+			name: "S01: Happy path",
+			args: args{
+				c:          mockS3ClientAllSuccess{},
+				bucketName: "happy-bucket",
+				region:     "ap-northeast-1",
+			},
+			want: &initS3Result{
+				BucketName:        "happy-bucket",
+				Region:            "ap-northeast-1",
+				BlockPublicAccess: "Enabled",
+				Encryption:        "AES256",
+				Versioning:        "Enabled",
+			},
+			wantErr: false,
+		},
+		{
+			name: "F01: CreateBucket fails",
+			args: args{
+				c:          mockS3ClientCreateBucketFailure{},
+				bucketName: "error-bucket",
+				region:     "ap-northeast-1",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "F02: PutPublicAccessBlock fails",
+			args: args{
+				c:          mockS3ClientPutPublicAccessBlockFailure{},
+				bucketName: "error-bucket",
+				region:     "ap-northeast-1",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "F03: PutBucketEncryption fails",
+			args: args{
+				c:          mockS3ClientPutBucketEncryptionFailure{},
+				bucketName: "error-bucket",
+				region:     "ap-northeast-1",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "F04: PutBucketVersioning fails",
+			args: args{
+				c:          mockS3ClientPutBucketVersioningFailure{},
+				bucketName: "error-bucket",
+				region:     "ap-northeast-1",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "F05: GetBucketLocation fails",
+			args: args{
+				c:          mockS3ClientGetBucketLocationFailure{},
+				bucketName: "error-bucket",
+				region:     "ap-northeast-1",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "F06: GetPublicAccessBlock fails",
+			args: args{
+				c:          mockS3ClientGetPublicAccessBlockFailure{},
+				bucketName: "error-bucket",
+				region:     "ap-northeast-1",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "F07: GetBucketEncryption fails",
+			args: args{
+				c:          mockS3ClientGetBucketEncryptionFailure{},
+				bucketName: "error-bucket",
+				region:     "ap-northeast-1",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "F08: GetBucketVersioning fails",
+			args: args{
+				c:          mockS3ClientGetBucketVersioningFailure{},
+				bucketName: "error-bucket",
+				region:     "ap-northeast-1",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := initS3(tt.args.c, tt.args.bucketName, tt.args.region)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("initS3() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("initS3() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_initS3Result_createTableInput(t *testing.T) {
+	type fields struct {
+		BucketName        string
+		Region            string
+		BlockPublicAccess string
+		Encryption        string
+		Versioning        string
+	}
+	tests := []struct {
+		name       string
+		fields     fields
+		wantHeader []string
+		wantBody   [][]string
+	}{
+		{
+			name: "S01: Happy path",
+			fields: fields{
+				BucketName:        "happy-bucket",
+				Region:            "ap-northeast-1",
+				BlockPublicAccess: "Enabled",
+				Encryption:        "AES256",
+				Versioning:        "Enabled",
+			},
+			wantHeader: []string{"PARAMETER", "VALUE"},
+			wantBody: [][]string{
+				{"Bucket name", "happy-bucket"},
+				{"Region", "ap-northeast-1"},
+				{"Block Public Access", "Enabled"},
+				{"Encryption", "AES256"},
+				{"Versioning", "Enabled"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			i := &initS3Result{
+				BucketName:        tt.fields.BucketName,
+				Region:            tt.fields.Region,
+				BlockPublicAccess: tt.fields.BlockPublicAccess,
+				Encryption:        tt.fields.Encryption,
+				Versioning:        tt.fields.Versioning,
+			}
+			gotHeader, gotBody := i.createTableInput()
+			if !reflect.DeepEqual(gotHeader, tt.wantHeader) {
+				t.Errorf("initS3Result.createTableInput() gotHeader = %v, want %v", gotHeader, tt.wantHeader)
+			}
+			if !reflect.DeepEqual(gotBody, tt.wantBody) {
+				t.Errorf("initS3Result.createTableInput() gotBody = %v, want %v", gotBody, tt.wantBody)
 			}
 		})
 	}

@@ -430,7 +430,7 @@ func TestGetBucketLocation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetBucketLocation(context.Background(), tt.args.api(t), tt.args.bucketName)
+			got, err := getBucketLocation(context.Background(), tt.args.api(t), tt.args.bucketName)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetBucketLocation() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -538,8 +538,8 @@ func (m mockS3GetBucketEncryptionAPI) GetBucketEncryption(ctx context.Context,
 }
 func Test_getBucketEncryption(t *testing.T) {
 	type args struct {
-		api    func(t *testing.T) S3GetBucketEncryption
-		optFns []func(*s3.Options)
+		api        func(t *testing.T) S3GetBucketEncryption
+		bucketName string
 	}
 	tests := []struct {
 		name    string
@@ -550,6 +550,7 @@ func Test_getBucketEncryption(t *testing.T) {
 		{
 			name: "S01: Happy path",
 			args: args{
+				bucketName: "happy-bucket",
 				api: func(t *testing.T) S3GetBucketEncryption {
 					return mockS3GetBucketEncryptionAPI(func(ctx context.Context, params *s3.GetBucketEncryptionInput, optFns ...func(*s3.Options)) (*s3.GetBucketEncryptionOutput, error) {
 						out := &s3.GetBucketEncryptionOutput{
@@ -581,6 +582,7 @@ func Test_getBucketEncryption(t *testing.T) {
 		{
 			name: "F01: Some error",
 			args: args{
+				bucketName: "error-bucket",
 				api: func(t *testing.T) S3GetBucketEncryption {
 					return mockS3GetBucketEncryptionAPI(func(ctx context.Context, params *s3.GetBucketEncryptionInput, optFns ...func(*s3.Options)) (*s3.GetBucketEncryptionOutput, error) {
 						return nil, errors.New("some error")
@@ -593,7 +595,7 @@ func Test_getBucketEncryption(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getBucketEncryption(context.Background(), tt.args.api(t), tt.args.optFns...)
+			got, err := getBucketEncryption(context.Background(), tt.args.api(t), tt.args.bucketName)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getBucketEncryption() error = %v, wantErr %v", err, tt.wantErr)
 				return

@@ -38,6 +38,22 @@ type S3Clientable interface {
 	PutBucketVersioning(ctx context.Context,
 		params *s3.PutBucketVersioningInput,
 		optFns ...func(*s3.Options)) (*s3.PutBucketVersioningOutput, error)
+
+	GetBucketLocation(ctx context.Context,
+		params *s3.GetBucketLocationInput,
+		optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error)
+
+	GetPublicAccessBlock(ctx context.Context,
+		params *s3.GetPublicAccessBlockInput,
+		optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error)
+
+	GetBucketEncryption(ctx context.Context,
+		params *s3.GetBucketEncryptionInput,
+		optFns ...func(*s3.Options)) (*s3.GetBucketEncryptionOutput, error)
+
+	GetBucketVersioning(ctx context.Context,
+		params *s3.GetBucketVersioningInput,
+		optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)
 }
 
 type DynamoDBClientable interface {
@@ -47,6 +63,14 @@ type DynamoDBClientable interface {
 	DescribeTable(ctx context.Context,
 		params *dynamodb.DescribeTableInput,
 		optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
+}
+
+type initS3Result struct {
+	BucketName        string
+	Region            string
+	BlockPublicAccess string
+	Encryption        string
+	Versioning        string
 }
 
 type initDynamoDBResult struct {
@@ -112,46 +136,61 @@ func runCmdAws(cmd *cobra.Command, args []string) error {
 
 	// Initialize S3 bucket.
 	s3 := s3.NewFromConfig(cfg)
-	if err := initS3(s3, bucketName, region); err != nil {
+	s3Res, err := initS3(s3, bucketName, region)
+	if err != nil {
 		return fmt.Errorf("failed to initialize s3 bucket: %w", err)
 	}
+	printCyan(fmt.Sprintf("Successfully create terraform backend - s3 bucket: %v\n", bucketName))
+	fmt.Printf("Detail ... \n\n")
+	sTable := tablewriter.NewWriter(os.Stdout)
+	h, b := s3Res.createTableInput()
+	sTable.SetHeader(h)
+	for _, v := range b {
+		sTable.Append(v)
+	}
+	sTable.SetAlignment(tablewriter.ALIGN_LEFT)
+	sTable.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+	sTable.SetCenterSeparator("|")
+	sTable.Render()
 
 	// Initialize DynamoDB table.
 	if tableName != "" {
 		dynamodb := dynamodb.NewFromConfig(cfg)
-		res, err := initDynamoDB(dynamodb, tableName, billingMode)
+		dynamoRes, err := initDynamoDB(dynamodb, tableName, billingMode)
 		if err != nil {
 			return fmt.Errorf("failed to initialize dynamodb table: %w", err)
 		}
 
 		printCyan(fmt.Sprintf("Successfully create terraform lock table - dynamodb table: %v\n", tableName))
 		fmt.Printf("Detail ... \n\n")
-		table := tablewriter.NewWriter(os.Stdout)
-		h, b := res.createTableInput()
-		table.SetHeader(h)
+		dTable := tablewriter.NewWriter(os.Stdout)
+		h, b := dynamoRes.createTableInput()
+		dTable.SetHeader(h)
 		for _, v := range b {
-			table.Append(v)
+			dTable.Append(v)
 		}
-		table.SetAlignment(tablewriter.ALIGN_LEFT)
-		table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-		table.SetCenterSeparator("|")
-		table.Render()
+		dTable.SetAlignment(tablewriter.ALIGN_LEFT)
+		dTable.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+		dTable.SetCenterSeparator("|")
+		dTable.Render()
 	}
 
 	return nil
 }
 
 // initS3 setup terraform backend with messages.
-func initS3(c S3Clientable, bucketName string, region string) error {
+func initS3(c S3Clientable, bucketName string, region string) (*initS3Result, error) {
 	fmt.Printf("\n")
-	fmt.Printf("Start to create terraform backend: s3 bucket ... \n")
+	fmt.Printf("---------------------------------------------------\n")
+	fmt.Printf("🚀 Start to create terraform backend: s3 bucket ... \n")
+	fmt.Printf("---------------------------------------------------\n")
 	fmt.Printf("\n")
 
 	// Create bucket
 	fmt.Printf("Step1: Creating bucket ... ")
 	if _, err := createS3Bucket(context.TODO(), c, bucketName, region); err != nil {
 		printRed("FAILURE\n\n")
-		return fmt.Errorf("failed to create s3 bucket: %w", err)
+		return nil, fmt.Errorf("failed to create s3 bucket: %w", err)
 	}
 	fmt.Printf("SUCCESS\n")
 
@@ -159,7 +198,7 @@ func initS3(c S3Clientable, bucketName string, region string) error {
 	fmt.Printf("Step2: Activate block public access ... ")
 	if _, err := enableAllPublicAccessBlock(context.TODO(), c, bucketName); err != nil {
 		printRed("FAILURE\n\n")
-		return fmt.Errorf("failed to activate block public access of s3 bucket: %w", err)
+		return nil, fmt.Errorf("failed to activate block public access of s3 bucket: %w", err)
 	}
 	fmt.Printf("SUCCESS\n")
 
@@ -167,7 +206,7 @@ func initS3(c S3Clientable, bucketName string, region string) error {
 	fmt.Printf("Step3: Activate default encryption (AES256) ... ")
 	if _, err := enableBucketEncryptionAES256(context.TODO(), c, bucketName); err != nil {
 		printRed("FAILURE\n\n")
-		return fmt.Errorf("failed to activate default encryption of s3 bucket: %w", err)
+		return nil, fmt.Errorf("failed to activate default encryption of s3 bucket: %w", err)
 	}
 	fmt.Printf("SUCCESS\n")
 
@@ -175,20 +214,71 @@ func initS3(c S3Clientable, bucketName string, region string) error {
 	fmt.Printf("Step4: Activate bucket versioning ... ")
 	if _, err := enableBucketVersioning(context.TODO(), c, bucketName); err != nil {
 		printRed("FAILURE\n\n")
-		return fmt.Errorf("failed to activate versioning: %w", err)
+		return nil, fmt.Errorf("failed to activate versioning: %w", err)
 	}
 	fmt.Printf("SUCCESS\n")
-	fmt.Printf("\n")
-	printCyan(fmt.Sprintf("Successfully create terraform backend - s3 bucket: %v\n", bucketName))
 
-	return nil
+	// Describe bucket
+	res := initS3Result{
+		BucketName: bucketName,
+	}
+
+	fmt.Printf("Step5: Confirmation - Get bucket location ... ")
+	locationRes, err := getBucketLocation(context.TODO(), c, bucketName)
+	if err != nil {
+		printRed("FAILURE\n\n")
+		return nil, fmt.Errorf("successfully created s3 bucket, but failed to describe s3 bucket: %w", err)
+	}
+	res.Region = string(locationRes.LocationConstraint)
+	fmt.Printf("SUCCESS\n")
+
+	fmt.Printf("Step6: Confirmation - Get block public access status ... ")
+	blockRes, err := getPublicAccessBlock(context.TODO(), c, bucketName)
+	if err != nil {
+		printRed("FAILURE\n\n")
+		return nil, fmt.Errorf("successfully created s3 bucket, but failed to describe s3 bucket: %w", err)
+	}
+	if blockRes.PublicAccessBlockConfiguration.BlockPublicAcls &&
+		blockRes.PublicAccessBlockConfiguration.BlockPublicPolicy &&
+		blockRes.PublicAccessBlockConfiguration.IgnorePublicAcls &&
+		blockRes.PublicAccessBlockConfiguration.RestrictPublicBuckets {
+		res.BlockPublicAccess = "Enabled"
+	} else if !blockRes.PublicAccessBlockConfiguration.BlockPublicAcls &&
+		!blockRes.PublicAccessBlockConfiguration.BlockPublicPolicy &&
+		!blockRes.PublicAccessBlockConfiguration.IgnorePublicAcls &&
+		!blockRes.PublicAccessBlockConfiguration.RestrictPublicBuckets {
+		res.BlockPublicAccess = "Not fully enabled"
+	}
+	fmt.Printf("SUCCESS\n")
+
+	fmt.Printf("Step7: Confirmation - Get bucket encryption status ... ")
+	encryptionRes, err := getBucketEncryption(context.TODO(), c, bucketName)
+	if err != nil {
+		printRed("FAILURE\n\n")
+		return nil, fmt.Errorf("successfully created s3 bucket, but failed to describe s3 bucket: %w", err)
+	}
+	if encryptionRes.ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault != nil {
+		res.Encryption = string(encryptionRes.ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault.SSEAlgorithm)
+	}
+	fmt.Printf("SUCCESS\n")
+
+	fmt.Printf("Step8: Confirmation - Get bucket versioning status ... ")
+	versioningRes, err := getBucketVersioning(context.TODO(), c, bucketName)
+	if err != nil {
+		printRed("FAILURE\n\n")
+		return nil, fmt.Errorf("successfully created s3 bucket, but failed to describe s3 bucket: %w", err)
+	}
+	res.Versioning = string(versioningRes.Status)
+	fmt.Printf("SUCCESS\n")
+
+	return &res, nil
 }
 
 // initDynamoDB setup terraform lock table with messages.
 func initDynamoDB(c DynamoDBClientable, tableName string, billingMode string) (*initDynamoDBResult, error) {
 	fmt.Printf("\n")
 	fmt.Printf("---------------------------------------------------\n")
-	fmt.Printf("Start to create terraform lock table: DynamoDB ... \n")
+	fmt.Printf("🚀 Start to create terraform lock table: DynamoDB ... \n")
 	fmt.Printf("---------------------------------------------------\n")
 	fmt.Printf("\n")
 
@@ -198,13 +288,17 @@ func initDynamoDB(c DynamoDBClientable, tableName string, billingMode string) (*
 		printRed("FAILURE\n\n")
 		return nil, fmt.Errorf("failed to create dynamodb table: %w", err)
 	}
-	fmt.Printf("SUCCESS\n\n")
+	fmt.Printf("SUCCESS\n")
 
 	// Describe table
+	fmt.Printf("Step2: Confirmation - Describe table ... ")
 	desc, err := describeDynamoDBTable(context.TODO(), c, tableName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create dynamodb table: %w", err)
+		printRed("FAILURE\n\n")
+		return nil, fmt.Errorf("successfully created dynamodb table, but failed to describe dynamodb table: %w", err)
 	}
+	fmt.Printf("SUCCESS\n")
+
 	res := initDynamoDBResult{}
 	if desc.Table.TableName != nil {
 		res.TableName = *desc.Table.TableName
@@ -222,6 +316,18 @@ func initDynamoDB(c DynamoDBClientable, tableName string, billingMode string) (*
 	}
 
 	return &res, nil
+}
+
+func (i *initS3Result) createTableInput() (header []string, body [][]string) {
+	h := []string{"PARAMETER", "VALUE"}
+	b := [][]string{
+		{"Bucket name", i.BucketName},
+		{"Region", i.Region},
+		{"Block Public Access", i.BlockPublicAccess},
+		{"Encryption", i.Encryption},
+		{"Versioning", i.Versioning},
+	}
+	return h, b
 }
 
 func (i *initDynamoDBResult) createTableInput() (header []string, body [][]string) {
