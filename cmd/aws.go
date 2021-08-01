@@ -181,9 +181,9 @@ func runCmdAws(cmd *cobra.Command, args []string) error {
 // initS3 setup terraform backend with messages.
 func initS3(c S3Clientable, bucketName string, region string) (*initS3Result, error) {
 	fmt.Printf("\n")
-	fmt.Printf("---------------------------------------------------\n")
+	fmt.Printf("---------------------------------------------------------\n")
 	fmt.Printf("🚀 Start to create terraform backend: s3 bucket ... \n")
-	fmt.Printf("---------------------------------------------------\n")
+	fmt.Printf("---------------------------------------------------------\n")
 	fmt.Printf("\n")
 
 	// Create bucket
@@ -277,9 +277,9 @@ func initS3(c S3Clientable, bucketName string, region string) (*initS3Result, er
 // initDynamoDB setup terraform lock table with messages.
 func initDynamoDB(c DynamoDBClientable, tableName string, billingMode string) (*initDynamoDBResult, error) {
 	fmt.Printf("\n")
-	fmt.Printf("---------------------------------------------------\n")
+	fmt.Printf("---------------------------------------------------------\n")
 	fmt.Printf("🚀 Start to create terraform lock table: DynamoDB ... \n")
-	fmt.Printf("---------------------------------------------------\n")
+	fmt.Printf("---------------------------------------------------------\n")
 	fmt.Printf("\n")
 
 	// Create table
