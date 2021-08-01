@@ -464,6 +464,86 @@ func Test_getPublicAccessBlock(t *testing.T) {
 	}
 }
 
+type mockS3GetBucketEncryptionAPI func(ctx context.Context,
+	params *s3.GetBucketEncryptionInput,
+	optFns ...func(*s3.Options)) (*s3.GetBucketEncryptionOutput, error)
+
+func (m mockS3GetBucketEncryptionAPI) GetBucketEncryption(ctx context.Context,
+	params *s3.GetBucketEncryptionInput,
+	optFns ...func(*s3.Options)) (*s3.GetBucketEncryptionOutput, error) {
+	return m(ctx, params, optFns...)
+}
+func Test_getBucketEncryption(t *testing.T) {
+	type args struct {
+		api    func(t *testing.T) S3GetBucketEncryption
+		optFns []func(*s3.Options)
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *types.ServerSideEncryptionConfiguration
+		wantErr bool
+	}{
+		{
+			name: "S01: Happy path",
+			args: args{
+				api: func(t *testing.T) S3GetBucketEncryption {
+					return mockS3GetBucketEncryptionAPI(func(ctx context.Context, params *s3.GetBucketEncryptionInput, optFns ...func(*s3.Options)) (*s3.GetBucketEncryptionOutput, error) {
+						out := &s3.GetBucketEncryptionOutput{
+							ServerSideEncryptionConfiguration: &types.ServerSideEncryptionConfiguration{
+								Rules: []types.ServerSideEncryptionRule{
+									{
+										ApplyServerSideEncryptionByDefault: &types.ServerSideEncryptionByDefault{
+											SSEAlgorithm: types.ServerSideEncryptionAes256,
+										},
+									},
+								},
+							},
+						}
+						return out, nil
+					})
+				},
+			},
+			want: &types.ServerSideEncryptionConfiguration{
+				Rules: []types.ServerSideEncryptionRule{
+					{
+						ApplyServerSideEncryptionByDefault: &types.ServerSideEncryptionByDefault{
+							SSEAlgorithm: types.ServerSideEncryptionAes256,
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "F01: Some error",
+			args: args{
+				api: func(t *testing.T) S3GetBucketEncryption {
+					return mockS3GetBucketEncryptionAPI(func(ctx context.Context, params *s3.GetBucketEncryptionInput, optFns ...func(*s3.Options)) (*s3.GetBucketEncryptionOutput, error) {
+						return nil, errors.New("some error")
+					})
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getBucketEncryption(context.Background(), tt.args.api(t), tt.args.optFns...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getBucketEncryption() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.want != nil {
+				if !reflect.DeepEqual(got.ServerSideEncryptionConfiguration, tt.want) {
+					t.Errorf("getBucketEncryption() got.ServerSideEncryptionConfiguration %v, want %v", got, tt.want)
+				}
+			}
+		})
+	}
+}
+
 type mockS3GetBucketVersioning func(ctx context.Context,
 	params *s3.GetBucketVersioningInput,
 	optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)

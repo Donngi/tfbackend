@@ -92,6 +92,17 @@ func getPublicAccessBlock(c context.Context, api S3GetPublicAccessBlockAPI, buck
 	return api.GetPublicAccessBlock(c, in)
 }
 
+type S3GetBucketEncryption interface {
+	GetBucketEncryption(ctx context.Context, params *s3.GetBucketEncryptionInput, optFns ...func(*s3.Options)) (*s3.GetBucketEncryptionOutput, error)
+}
+
+func getBucketEncryption(c context.Context, api S3GetBucketEncryption, optFns ...func(*s3.Options)) (*s3.GetBucketEncryptionOutput, error) {
+	in := &s3.GetBucketEncryptionInput{
+		Bucket: &bucketName,
+	}
+	return api.GetBucketEncryption(c, in)
+}
+
 type S3GetBucketVersioningAPI interface {
 	GetBucketVersioning(ctx context.Context, params *s3.GetBucketVersioningInput, optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)
 }
