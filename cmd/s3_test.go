@@ -381,6 +381,69 @@ func Test_enableBucketVersioning_Failure(t *testing.T) {
 	}
 }
 
+type mockS3GetBucketLocation func(ctx context.Context, params *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error)
+
+func (m mockS3GetBucketLocation) GetBucketLocation(ctx context.Context, params *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error) {
+	return m(ctx, params, optFns...)
+}
+
+func TestGetBucketLocation(t *testing.T) {
+	type args struct {
+		api        func(t *testing.T) S3GetbucketLocation
+		bucketName string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *string
+		wantErr bool
+	}{
+		{
+			name: "S01: Happy path",
+			args: args{
+				bucketName: "happy-bucket",
+				api: func(t *testing.T) S3GetbucketLocation {
+					return mockS3GetBucketLocation(func(ctx context.Context, params *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error) {
+						out := &s3.GetBucketLocationOutput{
+							LocationConstraint: types.BucketLocationConstraint("ap-northeast-1"),
+						}
+						return out, nil
+					})
+				},
+			},
+			want:    aws.String("ap-northeast-1"),
+			wantErr: false,
+		},
+		{
+			name: "F01: some error",
+			args: args{
+				bucketName: "error-bucket",
+				api: func(t *testing.T) S3GetbucketLocation {
+					return mockS3GetBucketLocation(func(ctx context.Context, params *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error) {
+						return nil, errors.New("some error")
+					})
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetBucketLocation(context.Background(), tt.args.api(t), tt.args.bucketName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetBucketLocation() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.want != nil {
+				if got.LocationConstraint != types.BucketLocationConstraint(*tt.want) {
+					t.Errorf("GetBucketLocation() got.LocationConstraint %v, want %v", got, tt.want)
+				}
+			}
+		})
+	}
+}
+
 type mockS3GetPublicAccessBlockAPI func(ctx context.Context,
 	params *s3.GetPublicAccessBlockInput,
 	optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error)

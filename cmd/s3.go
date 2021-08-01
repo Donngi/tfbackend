@@ -81,6 +81,17 @@ func enableBucketVersioning(c context.Context, api S3PutBucketVersioningAPI, buc
 	return api.PutBucketVersioning(c, in)
 }
 
+type S3GetbucketLocation interface {
+	GetBucketLocation(ctx context.Context, params *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error)
+}
+
+func GetBucketLocation(c context.Context, api S3GetbucketLocation, bucketName string) (*s3.GetBucketLocationOutput, error) {
+	in := &s3.GetBucketLocationInput{
+		Bucket: &bucketName,
+	}
+	return api.GetBucketLocation(c, in)
+}
+
 type S3GetPublicAccessBlockAPI interface {
 	GetPublicAccessBlock(ctx context.Context, params *s3.GetPublicAccessBlockInput, optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error)
 }
