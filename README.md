@@ -10,6 +10,19 @@ $ tfbackend aws --s3 YOUR_BUCKET_NAME --dynamodb YOUR_TABLE_NAME
 ### Other
 TBD
 
+## Installation
+### Homebrew
+```
+$ brew tap Jimon-s/tfbackend
+$ brew install tfbackend
+```
+
+### The others
+```
+go 1.16~
+$ go install github.com/Jimon-s/tfbackend@latest
+```
+
 ## Why is tfbackend worth?
 It is the best practice of terraform to create backend by means other than using terraform project itself.
 
@@ -27,12 +40,4 @@ For example, in AWS, you can make S3 bucket with
 - enabled transparent encryption
 - enabled versioning
 
-## Installation
-### Homebrew
-TBD
 
-### The others
-```
-go 1.16~
-$ go install github.com/Jimon-s/tfbackend@latest
-```
