@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -17,9 +18,18 @@ type S3CreateBucketAPI interface {
 func createS3Bucket(c context.Context, api S3CreateBucketAPI, bucketName string, region string) (*s3.CreateBucketOutput, error) {
 	in := &s3.CreateBucketInput{
 		Bucket: &bucketName,
-		CreateBucketConfiguration: &types.CreateBucketConfiguration{
+		// CreateBucketConfiguration: &types.CreateBucketConfiguration{
+		// 	LocationConstraint: ,
+		// },
+	}
+
+	if isValidLocationConstraint(region) {
+		in.CreateBucketConfiguration = &types.CreateBucketConfiguration{
 			LocationConstraint: types.BucketLocationConstraint(region),
-		},
+		}
+	} else if region != "us-east-1" {
+		// NOTE: us-east-1 is special region which doesn't need LocationConstraint.
+		return nil, fmt.Errorf("invalid region: %v", region)
 	}
 	return api.CreateBucket(c, in)
 }
@@ -131,4 +141,13 @@ func getBucketVersioning(c context.Context, api S3GetBucketVersioningAPI, bucket
 		Bucket: aws.String(bucketName),
 	}
 	return api.GetBucketVersioning(c, in)
+}
+
+func isValidLocationConstraint(location string) bool {
+	for _, region := range types.BucketLocationConstraint("").Values() {
+		if string(region) == location {
+			return true
+		}
+	}
+	return false
 }

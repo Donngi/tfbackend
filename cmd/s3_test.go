@@ -37,7 +37,7 @@ func Test_createBucket_Success(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "S01: Happy path",
+			name: "S01: ap-northeast-1",
 			args: args{bucketName: "sample-bucket", region: "ap-northeast-1"},
 			api: func(t *testing.T) S3CreateBucketAPI {
 				return mockS3CreateBucketAPI(func(ctx context.Context,
@@ -51,6 +51,23 @@ func Test_createBucket_Success(t *testing.T) {
 				})
 			},
 			want:    "ap-northeast-1",
+			wantErr: false,
+		},
+		{
+			name: "S02: us-east-1",
+			args: args{bucketName: "sample-bucket", region: "us-east-1"},
+			api: func(t *testing.T) S3CreateBucketAPI {
+				return mockS3CreateBucketAPI(func(ctx context.Context,
+					params *s3.CreateBucketInput,
+					optFns ...func(*s3.Options)) (*s3.CreateBucketOutput, error) {
+
+					output := &s3.CreateBucketOutput{
+						Location: aws.String("us-east-1"),
+					}
+					return output, nil
+				})
+			},
+			want:    "us-east-1",
 			wantErr: false,
 		},
 	}
@@ -97,6 +114,23 @@ func Test_createBucket_Failure(t *testing.T) {
 					optFns ...func(*s3.Options)) (*s3.CreateBucketOutput, error) {
 
 					return nil, errors.New("duplicated error")
+				})
+			},
+			want:    "failure💀",
+			wantErr: true,
+		},
+		{
+			name: "F02: Invalid region",
+			args: args{
+				bucketName: "duplicated-bucket",
+				region:     "invalid-region💀",
+			},
+			api: func(t *testing.T) S3CreateBucketAPI {
+				return mockS3CreateBucketAPI(func(ctx context.Context,
+					params *s3.CreateBucketInput,
+					optFns ...func(*s3.Options)) (*s3.CreateBucketOutput, error) {
+
+					return nil, errors.New("invalid region")
 				})
 			},
 			want:    "failure💀",
@@ -619,6 +653,7 @@ func (m mockS3GetBucketVersioning) GetBucketVersioning(ctx context.Context,
 
 	return m(ctx, params, optFns...)
 }
+
 func Test_getBucketVersioning(t *testing.T) {
 	type args struct {
 		api        func(t *testing.T) S3GetBucketVersioningAPI
@@ -677,6 +712,41 @@ func Test_getBucketVersioning(t *testing.T) {
 				if !reflect.DeepEqual(got.Status, tt.want) {
 					t.Errorf("getBucketVersioning() got.Status %v, want %v", got.Status, tt.want)
 				}
+			}
+		})
+	}
+}
+
+func Test_isValidLocationConstraint(t *testing.T) {
+	type args struct {
+		location string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "S01: ap-northeast-1",
+			args: args{
+				location: "ap-northeast-1",
+			},
+			want: true,
+		},
+		{
+			name: "F01: us-east-1",
+			args: args{
+				location: "us-east-1",
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isValidLocationConstraint(tt.args.location)
+
+			if tt.want != got {
+				t.Errorf("isValidLocationConstraint() got %v, want %v", got, tt.want)
 			}
 		})
 	}
