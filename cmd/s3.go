@@ -18,9 +18,6 @@ type S3CreateBucketAPI interface {
 func createS3Bucket(c context.Context, api S3CreateBucketAPI, bucketName string, region string) (*s3.CreateBucketOutput, error) {
 	in := &s3.CreateBucketInput{
 		Bucket: &bucketName,
-		// CreateBucketConfiguration: &types.CreateBucketConfiguration{
-		// 	LocationConstraint: ,
-		// },
 	}
 
 	if isValidLocationConstraint(region) {
