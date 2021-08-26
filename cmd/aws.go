@@ -17,7 +17,6 @@ import (
 
 var (
 	bucketName  string
-	region      string
 	tableName   string
 	billingMode string
 )
@@ -108,7 +107,6 @@ By default, the table configuration is below.
 	cmd.MarkFlagRequired("s3")
 	cmd.Flags().StringVarP(&tableName, "dynamodb", "", "", "Name of DynamoDB table to create.")
 	cmd.Flags().StringVarP(&billingMode, "billing-mode", "", "", "DynamoDB billing mode. Only 'PAY_PER_REQUEST' or 'PROVISIONED' can be accepted. Default is PROVISIONED.")
-	cmd.Flags().StringVarP(&region, "region", "", "", "Region where resources will be created. If not specified, tfbackend automatically set region from your cli configuration.")
 
 	return cmd
 }
@@ -130,13 +128,10 @@ func runCmdAws(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("configuration error: %w", err)
 	}
-	if region == "" {
-		region = cfg.Region
-	}
 
 	// Initialize S3 bucket.
 	s3 := s3.NewFromConfig(cfg)
-	s3Res, err := initS3(s3, bucketName, region)
+	s3Res, err := initS3(s3, bucketName, cfg.Region)
 	if err != nil {
 		return fmt.Errorf("failed to initialize s3 bucket: %w", err)
 	}
